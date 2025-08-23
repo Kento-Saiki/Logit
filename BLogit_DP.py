@@ -7,7 +7,7 @@ start = time.time()
 
 #状況の設定
 #席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
-mu=-0.1  #価格感応度
+mu=-0.001  #価格感応度
 N_init = 2000 # 販売開始時点の潜在顧客数
 C_init = 1000  # 販売開始時点のチケット在庫数（キャパシティ）
 T = 10        # 全販売期間（日数）
@@ -60,7 +60,7 @@ def opt_r_t(C, V_next, N_t):
         values.append(value)
     # 計算した価値リストの中から、最大値のインデックスを取得
     best_price_index = np.argmax(values)
-    # 最適価格と最大価値を返す
+    # 最適価格と最大価値を(配列のインデックスから)返す
     r_max = price_candidates[best_price_index]
     V_max = values[best_price_index]
     return r_max, V_max
@@ -125,19 +125,17 @@ for t in t_values: #時間を前向きに進めながら計算
     # 最適価格r_maxにおける期待販売数量を計算
     # 期待値 = 潜在顧客数 N_t * 購入確率 P(r_max)
     expected_sales = N_dict[t] * P(r_max)
-    
     # 整数にし、在庫を超えないように調整
-    sold_qty = int(round(expected_sales))
-    sold_qty = min(current_C, sold_qty)
-    
+    expected_sales = int(round(expected_sales))
+    sold_qty = min(current_C, expected_sales)
     # 計算された販売枚数をリストに保存
     sales.append(sold_qty)
-
     # 在庫を更新
     C_values.append(current_C - sold_qty)
 
 print(f"各期間の最適価格: {r_values}")
 print(f"各期間の在庫数: {C_values}")
 print(f"各期間の販売枚数: {sales}")
+
 end = time.time()
 print(f"Total time: {(end - start) / 60:.2f} minutes")
