@@ -9,8 +9,16 @@ start = time.time()
 #席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
 mu=-1  #価格感応度
 N_init = 2000 # 販売開始時点の潜在顧客数
-C_init = 300  # 販売開始時点のチケット在庫数（キャパシティ）
+C_init = 1000  # 販売開始時点のチケット在庫数（キャパシティ）
 T = 10        # 全販売期間（日数）
+
+# 最適価格の探索範囲を離散値で定義
+price_min = 1000
+price_max = 5000
+price_step = 100 # 100円刻みで価格を探索
+price_candidates = np.arange(price_min, price_max + price_step, price_step)
+
+print(f"探索する価格候補 (一部): {price_candidates[:5]} ...")
 
 # 任意の1人の顧客が価格rで購入する確率P(r)の定義
 def P(r): #exp(Vi)/{exp(0)+exp(Vi)} 何も購入しない場合の効用V0=0
@@ -44,16 +52,32 @@ def V_t(r, C, V_next, N_t): #最終期間前日以前の価値関数⇒これ以
     return np.sum(probs * (np.minimum(s, C) * r + V_next_values)) #時刻t (0=<t<T-1)の価値関数を返す
 
 #最適価格 r*を求める関数（V_nextは関数）価値関数V_tが最大（-V_t が最小）になる価格 rをt探索
-def opt_r_t(C, V_next, N_t): #引数は，在庫C，次の時点の価値関数V_next，潜在顧客数N_t
-    result = minimize_scalar(lambda r:-V_t(r, C, V_next, N_t), bounds=(0, 12),#最適価格範囲：0~12 (連続値)
-                              method='bounded') #minimize_scalar():最小化
-    return result.x, V_t(result.x, C, V_next, N_t) #最適価格,その時の価値関数
+# 最適価格 r*を求める関数（離散値探索版）
+def opt_r_t(C, V_next, N_t):
+    values = [] # 各価格候補に対する価値を保存するリスト
+    # 全ての価格候補をループで評価
+    for r in price_candidates:
+        value = V_t(r, C, V_next, N_t)
+        values.append(value)
+    # 計算した価値リストの中から、最大値のインデックスを取得
+    best_price_index = np.argmax(values)
+    # 最適価格と最大価値を返す
+    r_max = price_candidates[best_price_index]
+    V_max = values[best_price_index]
+    return r_max, V_max
 
-def opt_r_1(C, N_t): #最終期間前日T-1の最適価格を求める関数
-                    #⇒引数は，在庫C，潜在顧客数N_t
-    result = minimize_scalar(lambda r:-V_1(r, C, N_t), bounds=(0, 12),
-                              method='bounded')
-    return result.x, V_1(result.x, C, N_t)
+def opt_r_1(C, N_t):
+    values = [] # 各価格候補に対する価値を保存するリスト
+    # 全ての価格候補をループで評価
+    for r in price_candidates:
+        value = V_1(r, C, N_t)
+        values.append(value)
+    # 計算した価値リストの中から、最大値のインデックスを取得
+    best_price_index = np.argmax(values)
+    # 最適価格と最大価値を返す
+    r_max = price_candidates[best_price_index]
+    V_max = values[best_price_index]
+    return r_max, V_max
 
 # 顧客数の減少パターンを定義
 N_dict = {0: N_init} #時刻0において初期顧客数がN_init人存在していることを定義
