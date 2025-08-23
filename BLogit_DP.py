@@ -35,7 +35,6 @@ def V_1(r, C, N_t): #最終期間前日の価値関数⇒これ以降，在庫�
                                                 #⇒確率の相対的な大きさに変換
     probs /= probs.sum()#相対的な大きさから，合計が1になるように正規化
     return np.sum(probs * np.minimum(s, C) * r) #時刻T-1の価値関数を返す
-
 def V_t(r, C, V_next, N_t): #最終期間前日以前の価値関数⇒これ以降も在庫の価値あり
     s = np.arange(N_t + 1) #購入希望者数sが0人からN_t人までの全パターン
                           #⇒Σを計算するための配列
@@ -65,7 +64,6 @@ def opt_r_t(C, V_next, N_t):
     r_max = price_candidates[best_price_index]
     V_max = values[best_price_index]
     return r_max, V_max
-
 def opt_r_1(C, N_t):
     values = [] # 各価格候補に対する価値を保存するリスト
     # 全ての価格候補をループで評価
@@ -108,8 +106,6 @@ for t in range(T-2,-1,-1): #時間を遡って計算 T-2⇒T-1⇒...⇒0
         #仮にC=0の場合（購入者数が在庫を上回り0になった場合）は，価値関数は0とする
         r_max, V_max = opt_r_t(C, lambda C: V_dict[t+1].get(C, 0), N_dict[t]) #T-1より前の時点なので在庫を考慮
         V_dict[t][C] = V_max
-
-
 
 # 各期間の最適価格を計算（前向き計算の実施）「具体的な駒の動き」
 t_values = range(T) # 各期間の時刻t 0,1,2,...,T-1
