@@ -91,20 +91,33 @@ for t in range(T-2,-1,-1): #時間を遡って計算 T-2⇒T-1⇒...⇒0
 t_values = range(T) # 各期間の時刻t 0,1,2,...,T-1
 r_values = [] # 各期間の最適価格を格納するリスト
 C_values = [C_init] #在庫の初期値を設定してスタート
+sales = [] # ← 販売枚数を格納するリスト
 
 for t in t_values: #時間を前向きに進めながら計算
+    current_C = C_values[-1]
+
     if t < T-1: #最終販売日前日以前 T-1の場合
         r_max, _ = opt_r_t(C_values[-1], lambda C: V_dict[t+1].get(C, 0), N_dict[t])
     else:
         r_max, _ = opt_r_1(C_values[-1], N_dict[t])
     r_values.append(r_max)
-    if t < T-1: #その日の販売枚数を仮定して在庫を減らし、次の日の在庫状況を更新
-        if t < T // 2:
-            C_values.append(max(C_values[-1]- 5, 0)) 
-        else:
-            C_values.append(max(C_values[-1]- 10, 0))
+
+    # 最適価格r_maxにおける期待販売数量を計算
+    # 期待値 = 潜在顧客数 N_t * 購入確率 P(r_max)
+    expected_sales = N_dict[t] * P(r_max)
+    
+    # 整数にし、在庫を超えないように調整
+    sold_qty = int(round(expected_sales))
+    sold_qty = min(current_C, sold_qty)
+    
+    # 計算された販売枚数をリストに保存
+    sales.append(sold_qty)
+
+    # 在庫を更新
+    C_values.append(current_C - sold_qty)
 
 print(f"各期間の最適価格: {r_values}")
 print(f"各期間の在庫数: {C_values}")
+print(f"各期間の販売枚数: {sales}")
 end = time.time()
 print(f"Total time: {(end - start) / 60:.2f} minutes")
