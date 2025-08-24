@@ -30,8 +30,8 @@ class DemandEstimator:
             raise ValueError("product_idsは空にできません。")
         
         self.base_feature_cols = [col for col in feature_cols if col != '残り日数'] # [残り日数，相手ランク，順位]
-        self.extended_feature_cols = self.base_feature_cols + ['残り日数'] +  ['締め切り効果']#  [残り日数，相手ランク，順位]+[締め切り効果] 
-        
+        self.extended_feature_cols = self.base_feature_cols + ['残り日数'] +  ['締め切り効果']+ ['開始効果']#  [残り日数，相手ランク，順位]+[締め切り効果] + [開始効果]
+
         self.product_ids = product_ids
         self.regularization_strength = regularization_strength
         self.alpha_hat = None
@@ -43,6 +43,7 @@ class DemandEstimator:
         df = df_raw.copy()
         df['残り日数'] = df['残り日数']
         df['締め切り効果'] = 1.0 / (df['残り日数']**2 + 10)
+        df['開始効果'] = -np.log(df['経過日数'] + 0.1) / ((df['経過日数'] + 0.1) ** 4)  # ゼロ除算を避けるために小さな値を加える
         df['obs_id'] = df.groupby(['試合名', '残り日数']).ngroup()
         return df
     
@@ -158,6 +159,7 @@ class DemandEstimator:
         df_scaled = df_features_for_day.copy()
         df_scaled['残り日数'] = df_scaled['残り日数']
         df_scaled['締め切り効果'] = 1 / (df_scaled['残り日数']**2 + 10)
+        df_scaled['開始効果'] = -np.log(df_scaled['経過日数'] + 0.1) / ((df_scaled['経過日数'] + 0.1) ** 4)  # ゼロ除算を避けるために小さな値を加える
 
         df_scaled[self.extended_feature_cols] = self.scaler.transform(df_scaled[self.extended_feature_cols])
         utilities = {}
@@ -252,7 +254,7 @@ for file in train_files:
         df = df.iloc[6:].copy() # インデックス6から最後までを使用
         train_df_list.append(df)
 df_train = pd.concat(train_df_list, ignore_index=True)
-df_train = df_train.dropna(subset=feature_cols + ['販売数量'])
+df_train = df_train.dropna(subset=feature_cols + ['販売数量']+['経過日数']) #変数追加
 print(f"学習データの総件数: {len(df_train)}件")
 
 
@@ -289,7 +291,7 @@ for simulation_target_file in all_csv_files:
     df_test['試合名'] = testmatch_name
     df_test['席種'] = df_test['席種'].str.replace(r'^\d+:\s*', '', regex=True)
     df_test = df_test[df_test['席種'].str.contains("ミックスバック自由席|ホームサポーター自由席", na=False)].copy() #席種の限定|ホームバック自由席
-    df_test = df_test.dropna(subset=feature_cols + ['販売数量']+['経過日数'])
+    df_test = df_test.dropna(subset=feature_cols + ['販売数量']+['経過日数']) #変数追加
     print(f"シミュレーションデータの総件数: {len(df_test)}件")
     print(f"\n--- 『{testmatch_name}』の販売シミュレーション開始 ---")
     # --- ここから、クラス外でのn0とLambdaの計算部分 --------------------------------------------------------------
