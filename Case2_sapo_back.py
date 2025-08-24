@@ -236,7 +236,7 @@ train_files = [f for f in all_csv_files] # if f != simulation_target_file
 print(f"学習データ数: {len(train_files)}試合")
 #1: シミュレーション対象をファイルパスで指定 ###
 
-product_ids = ['ミックスバック自由席','ホームサポーター自由席','ホームバック自由席'] #,"ホームバック自由席"
+product_ids = ['ミックスバック自由席','ホームサポーター自由席'] #,"ホームバック自由席"
 feature_cols = ['販売価格', '残り日数', "相手ランク"] #, "相手ランク", "順位"
 REGULARIZATION = 0.0001
 
@@ -248,7 +248,7 @@ for file in train_files:
         df = pd.read_csv(file, encoding='utf-8-sig')
         df['試合名'] = os.path.basename(file).replace('.csv', '')
         df['席種'] = df['席種'].str.replace(r'^\d+:\s*', '', regex=True)
-        df = df[df['席種'].str.contains("ミックスバック自由席|ホームサポーター自由席|ホームバック自由席", na=False)].copy() #席種の限定|ホームバック自由席
+        df = df[df['席種'].str.contains("ミックスバック自由席|ホームサポーター自由席", na=False)].copy() #席種の限定|ホームバック自由席
         df = df.iloc[6:].copy() # インデックス6から最後までを使用
         train_df_list.append(df)
 df_train = pd.concat(train_df_list, ignore_index=True)
@@ -288,7 +288,7 @@ for simulation_target_file in all_csv_files:
     df_test = pd.read_csv(simulation_target_file, encoding='utf-8-sig')
     df_test['試合名'] = testmatch_name
     df_test['席種'] = df_test['席種'].str.replace(r'^\d+:\s*', '', regex=True)
-    df_test = df_test[df_test['席種'].str.contains("ミックスバック自由席|ホームサポーター自由席|ホームバック自由席", na=False)].copy() #席種の限定|ホームバック自由席
+    df_test = df_test[df_test['席種'].str.contains("ミックスバック自由席|ホームサポーター自由席", na=False)].copy() #席種の限定|ホームバック自由席
     df_test = df_test.dropna(subset=feature_cols + ['販売数量'])
     print(f"シミュレーションデータの総件数: {len(df_test)}件")
     print(f"\n--- 『{testmatch_name}』の販売シミュレーション開始 ---")
