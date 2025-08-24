@@ -30,7 +30,7 @@ class DemandEstimator:
             raise ValueError("product_idsは空にできません。")
         
         self.base_feature_cols = [col for col in feature_cols if col != '残り日数'] # [残り日数，相手ランク，順位]
-        self.extended_feature_cols = self.base_feature_cols + ['残り日数'] #  [残り日数，相手ランク，順位]+[締め切り効果] 
+        self.extended_feature_cols = self.base_feature_cols + ['残り日数'] +  ['締め切り効果']#  [残り日数，相手ランク，順位]+[締め切り効果] 
         
         self.product_ids = product_ids
         self.regularization_strength = regularization_strength
@@ -42,6 +42,7 @@ class DemandEstimator:
     def _prepare_data(self, df_raw):
         df = df_raw.copy()
         df['残り日数'] = df['残り日数']
+        df['締め切り効果'] = 1.0 / (df['残り日数']**2 + 10)
         df['obs_id'] = df.groupby(['試合名', '残り日数']).ngroup()
         return df
     
@@ -156,6 +157,8 @@ class DemandEstimator:
     def predict_probas(self, df_features_for_day):
         df_scaled = df_features_for_day.copy()
         df_scaled['残り日数'] = df_scaled['残り日数']
+        df_scaled['締め切り効果'] = 1 / (df_scaled['残り日数']**2 + 10)
+
         df_scaled[self.extended_feature_cols] = self.scaler.transform(df_scaled[self.extended_feature_cols])
         utilities = {}
         for _, row in df_scaled.iterrows():
@@ -295,6 +298,7 @@ for simulation_target_file in all_csv_files:
     # df_testに前処理を適用（fit_case2の_prepare_dataと同様の処理）
     df_test_processed_for_n0_lambda = df_test.copy()
     df_test_processed_for_n0_lambda['残り日数'] = df_test_processed_for_n0_lambda['残り日数']
+    df_test_processed_for_n0_lambda['締め切り効果'] = 1.0 / (df_test_processed_for_n0_lambda['残り日数']**2 + 10)
     df_test_processed_for_n0_lambda['obs_id'] = df_test_processed_for_n0_lambda.groupby(['試合名', '残り日数']).ngroup()
 
     # 学習済みスケーラーでテストデータの特徴量を変換
