@@ -188,7 +188,7 @@ plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.size'] = 24
 
 #最適価格の推移
-days_remaining = np.arange(T, 0, -1)
+days_remaining = np.arange(T-1, -1, -1)
 plt.subplot(1, 2, 1)
 plt.plot(days_remaining, r_A_values, color='blue', markersize=4, label='Home Back')
 plt.plot(days_remaining, r_B_values, color='red', markersize=4, label='Mix Back')
@@ -197,7 +197,7 @@ plt.xlabel('Remaining Days Until Match')
 plt.ylabel('Price')
 plt.legend()
 # 3. X軸の範囲と反転をサブプロット(axs[0])に設定
-plt.xlim(T, 0) # 左にT、右に0を設定するだけで反転も兼ねる
+plt.xlim(T-1, 0) # 左にT、右に0を設定するだけで反転も兼ねる
 
 # 在庫の推移 ---
 # 1. X軸のデータを「残り日数」で作成 (在庫はT+1個のデータ点がある)
