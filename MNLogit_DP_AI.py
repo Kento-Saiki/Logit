@@ -1,10 +1,12 @@
 import numpy as np
+import pandas as pd
 
 # ハイパーパラメータ
 alpha = 0.1  # 学習率
 gamma = 0.9  # 割引率
 epsilon = 0.1  # 探索率（ε-グリーディ）
-num_episodes = 10000  # エピソード数
+num_episodes = 10000  # 学習エピソード数
+num_simulations = 100  # 収益シミュレーションの試行回数
 
 # 状態空間
 days = 10  # 1～10日
@@ -42,7 +44,6 @@ def choice_probabilities(pA, pB, t):
 # シミュレーション環境
 def simulate_sales(pA, pB, t, seats_A_left, seats_B_left):
     P_A, P_B, _ = choice_probabilities(pA, pB, t)
-    # 購入枚数を二項分布でサンプリング
     n_A = min(np.random.binomial(num_customers, P_A), seats_A_left)
     n_B = min(np.random.binomial(num_customers, P_B), seats_B_left)
     reward = pA * n_A + pB * n_B
@@ -55,14 +56,13 @@ state_to_idx = {s: i for i, s in enumerate(state_space)}
 
 # Q学習
 for episode in range(num_episodes):
-    # 初期状態：10日前、席種A=100、席種B=150
-    t, seats_A_left, seats_B_left = 1, 100, 150
+    t, seats_A_left, seats_B_left = 1, 100, 150  # 初期状態
     done = False
     
     while not done:
         state = (t, seats_A_left, seats_B_left)
         if state not in state_to_idx:
-            break  # 状態が離散化外の場合終了
+            break
         
         state_idx = state_to_idx[state]
         
@@ -79,12 +79,12 @@ for episode in range(num_episodes):
         next_t = t + 1
         next_state = (next_t, next_seats_A, next_seats_B)
         
-        # 終了条件：10日終了または在庫ゼロ
+        # 終了条件
         if next_t > days or (next_seats_A == 0 and next_seats_B == 0):
             done = True
             next_Q = 0
         else:
-            next_state_idx = state_to_idx.get(next_state, state_idx)  # 離散化で状態が存在しない場合を考慮
+            next_state_idx = state_to_idx.get(next_state, state_idx)
             next_Q = np.max(Q[next_state_idx])
         
         # Q値更新
@@ -93,12 +93,57 @@ for episode in range(num_episodes):
         # 状態更新
         t, seats_A_left, seats_B_left = next_t, next_seats_A, next_seats_B
     
-    # 探索率の減衰（オプション）
-    epsilon = max(0.01, epsilon * 0.995)
+    epsilon = max(0.01, epsilon * 0.995)  # 探索率の減衰
 
-# 学習結果の出力（例：初日、満席時の最適価格）
-state = (1, 100, 150)
-state_idx = state_to_idx[state]
-optimal_action_idx = np.argmax(Q[state_idx])
-optimal_pA, optimal_pB = actions[optimal_action_idx]
-print(f"初日、席種A=100枚、席種B=150枚での最適価格：席種A={optimal_pA}円、席種B={optimal_pB}円")
+# 全日程の最適価格と期待収益を計算
+results = []
+for t in range(1, days + 1):
+    # 代表的な状態（例：初期在庫または中間在庫）
+    for seats_A_left, seats_B_left in [(100, 150), (50, 75)]:  # 初期と中間
+        state = (t, seats_A_left, seats_B_left)
+        if state not in state_to_idx:
+            continue
+        
+        state_idx = state_to_idx[state]
+        optimal_action_idx = np.argmax(Q[state_idx])
+        optimal_pA, optimal_pB = actions[optimal_action_idx]
+        
+        # 期待収益の計算（モンテカルロシミュレーション）
+        total_rewards = []
+        for _ in range(num_simulations):
+            reward, _, _ = simulate_sales(optimal_pA, optimal_pB, t, seats_A_left, seats_B_left)
+            total_rewards.append(reward)
+        expected_reward = np.mean(total_rewards)
+        
+        results.append({
+            'Day': t,
+            'Seats_A': seats_A_left,
+            'Seats_B': seats_B_left,
+            'Price_A': optimal_pA,
+            'Price_B': optimal_pB,
+            'Expected_Revenue': expected_reward
+        })
+
+# 結果をデータフレームで表示
+df_results = pd.DataFrame(results)
+print("\n全日程の最適価格と期待収益:")
+print(df_results)
+
+# 総収益の推定（初期状態から最適価格でシミュレーション）
+total_rewards = []
+for _ in range(num_simulations):
+    t, seats_A_left, seats_B_left = 1, 100, 150
+    total_reward = 0
+    while t <= days and (seats_A_left > 0 or seats_B_left > 0):
+        state = (t, seats_A_left, seats_B_left)
+        state_idx = state_to_idx.get(state, None)
+        if state_idx is None:
+            break
+        action_idx = np.argmax(Q[state_idx])
+        pA, pB = actions[action_idx]
+        reward, next_seats_A, next_seats_B = simulate_sales(pA, pB, t, seats_A_left, seats_B_left)
+        total_reward += reward
+        t, seats_A_left, seats_B_left = t + 1, next_seats_A, next_seats_B
+    total_rewards.append(total_reward)
+print(f"\n全日程の総期待収益（平均）：{np.mean(total_rewards):.2f}円")
+print(f"総期待収益の標準偏差：{np.std(total_rewards):.2f}円")
