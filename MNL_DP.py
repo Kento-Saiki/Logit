@@ -13,10 +13,10 @@ start = time.time()
 # --- 1. 状況の設定 ---
 # 席種A, B および「購入しない」選択肢
 # 顧客・在庫・期間のパラメータ
-N_init = 40      # 販売開始時点の潜在顧客数
+N_init = 400      # 販売開始時点の潜在顧客数
 T = 3            # 全販売期間（日数）
-C_A_init = 10    # 席種Aの初期在庫
-C_B_init = 12    # 席種Bの初期在庫
+C_A_init = 100    # 席種Aの初期在庫
+C_B_init = 120    # 席種Bの初期在庫
 
 # 多項ロジットモデルのパラメータ（仮定）
 alpha_A = 2.0019 #ホームバック自由席
@@ -27,7 +27,7 @@ print(f"初期在庫: 席種A={C_A_init}, 席種B={C_B_init}, 潜在顧客数={N
 print(f"多項ロジットモデルのパラメータ: α_A={alpha_A}, α_B={alpha_B}, β_price={beta_price}")
 
 # 最適価格の探索範囲を離散値で定義
-price_candidates = np.arange(2000, 4001, 200)
+price_candidates = np.arange(2000, 4001, 100)
 print(f"探索する価格候補: {price_candidates}")
 
 
