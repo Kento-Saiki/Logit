@@ -63,15 +63,16 @@ def opt_r_1(C, N_t):
 
 
 #状況の設定----------------------------------------------------------------------------------------------------
+#状況の設定
 #席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
 mu=-0.001  #価格感応度
-N_init = 200 # 販売開始時点の潜在顧客数
-C_init = 100  # 販売開始時点のチケット在庫数（キャパシティ）
-T = 5        # 全販売期間（日数）
+N_init = 2000 # 販売開始時点の潜在顧客数
+C_init = 1000  # 販売開始時点のチケット在庫数（キャパシティ）
+T = 10        # 全販売期間（日数）
 
 # 最適価格の探索範囲を離散値で定義
 price_min = 1000
-price_max = 3000
+price_max = 5000
 price_step = 100 # 100円刻みで価格を探索
 price_candidates = np.arange(price_min, price_max + price_step, price_step)
 
@@ -126,7 +127,7 @@ for t in t_values: #時間を前向きに進めながら計算
     r_values.append(r_max)
 
     # 最適価格r_maxにおける期待販売数量を計算
-    # 期待値 = 潜在顧客数 N_t * 購入確率 P(r_max)
+    # 期待値 = 潜在顧客数 N_t * 購入確率 P(r_max)，ここでN_dict[t]は潜在顧客数N_tに対応（実際は，潜在顧客から購入者数を引くという形式にしたい）
     expected_sales = N_dict[t] * P(r_max)
     # 整数にし、在庫を超えないように調整
     expected_sales = int(round(expected_sales))
