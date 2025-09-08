@@ -24,7 +24,7 @@ C_B_init = 10    # 席種Bの初期在庫
 # 多項ロジットモデルのパラメータ（仮定）
 alpha_A = 4.4919 #ホームバック自由席
 alpha_B = 4.4541 #ミックスバック自由席
-beta_price = -0.0005
+beta_price = -0.0019
 
 print(f"初期在庫: 席種A={C_A_init}, 席種B={C_B_init}, 潜在顧客数={N_init}, 販売期間={T}日")
 print(f"多項ロジットモデルのパラメータ: α_A={alpha_A}, α_B={alpha_B}, β_price={beta_price}")
