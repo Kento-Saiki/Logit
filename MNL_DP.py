@@ -2,6 +2,11 @@ import numpy as np
 from scipy.special import gammaln
 import time
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+# 日本語フォントの設定
+plt.rcParams['font.family'] = "Yu Gothic" # Windowsの場合
+plt.rcParams['axes.unicode_minus'] = False
 
 start = time.time()
 
