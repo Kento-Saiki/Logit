@@ -22,12 +22,12 @@ C_A_init = 10    # 席種Aの初期在庫
 C_B_init = 10    # 席種Bの初期在庫
 
 # 多項ロジットモデルのパラメータ（仮定）
-alpha_A = 0.2
+alpha_A = 0.3
 alpha_B = 0.1
 beta_price = -0.001
 
 # 最適価格の探索範囲を離散値で定義
-price_candidates = np.arange(2000, 4001, 1000)
+price_candidates = np.arange(2000, 4001, 400)
 print(f"探索する価格候補: {price_candidates}")
 
 
