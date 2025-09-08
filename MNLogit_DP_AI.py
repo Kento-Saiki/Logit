@@ -12,7 +12,8 @@ num_simulations = 100  # 収益シミュレーションの試行回数
 days = 10  # 1～10日
 seats_A = np.arange(0, 101, 10)  # 0, 10, ..., 100
 seats_B = np.arange(0, 151, 10)  # 0, 10, ..., 150
-state_space = [(t, a, b) for t in range(1, days + 1) for a in seats_A for b in seats_B]
+customers = np.arange(0, 601, 50)  # 0, 50, ..., 600（潜在顧客数、50人刻み）
+state_space = [(t, a, b, c) for t in range(1, days + 1) for a in seats_A for b in seats_B for c in customers]
 num_states = len(state_space)
 
 # 行動空間
@@ -28,7 +29,7 @@ beta_0_A = 2.0  # 席種Aの基本効用
 beta_0_B = 1.5  # 席種Bの基本効用
 beta_p = -0.002  # 価格感度（負）
 beta_t = 0.1  # 残り日数の影響（正）
-num_customers = 600  # 潜在顧客数
+initial_customers = 600  # 初期潜在顧客数
 
 # 多項ロジットモデルによる購入確率
 def choice_probabilities(pA, pB, t):
@@ -41,28 +42,34 @@ def choice_probabilities(pA, pB, t):
     P_0 = np.exp(v_0) / denom
     return P_A, P_B, P_0
 
-# シミュレーション環境
-def simulate_sales(pA, pB, t, seats_A_left, seats_B_left):
+# シミュレーション環境（顧客数減少を考慮）
+def simulate_sales(pA, pB, t, seats_A_left, seats_B_left, customers_left):
     P_A, P_B, _ = choice_probabilities(pA, pB, t)
-    n_A = min(np.random.binomial(num_customers, P_A), seats_A_left)
-    n_B = min(np.random.binomial(num_customers, P_B), seats_B_left)
+    # 購入枚数は残在庫と残顧客数で制限
+    n_A = min(np.random.binomial(customers_left, P_A), seats_A_left)
+    n_B = min(np.random.binomial(customers_left, P_B), seats_B_left)
     reward = pA * n_A + pB * n_B
     next_seats_A = max(seats_A_left - n_A, 0)
     next_seats_B = max(seats_B_left - n_B, 0)
-    return reward, next_seats_A, next_seats_B
+    next_customers = max(customers_left - n_A - n_B, 0)
+    return reward, next_seats_A, next_seats_B, next_customers
 
 # 状態インデックス取得
 state_to_idx = {s: i for i, s in enumerate(state_space)}
 
 # Q学習
 for episode in range(num_episodes):
-    t, seats_A_left, seats_B_left = 1, 100, 150  # 初期状態
+    t, seats_A_left, seats_B_left, customers_left = 1, 100, 150, initial_customers  # 初期状態
     done = False
     
     while not done:
-        state = (t, seats_A_left, seats_B_left)
+        state = (t, seats_A_left, seats_B_left, customers_left)
         if state not in state_to_idx:
-            break
+            # 離散化外の状態を近似（最も近い顧客数を選択）
+            closest_c = customers[np.argmin(np.abs(customers - customers_left))]
+            state = (t, seats_A_left, seats_B_left, closest_c)
+            if state not in state_to_idx:
+                break
         
         state_idx = state_to_idx[state]
         
@@ -75,15 +82,20 @@ for episode in range(num_episodes):
         pA, pB = actions[action_idx]
         
         # シミュレーション実行
-        reward, next_seats_A, next_seats_B = simulate_sales(pA, pB, t, seats_A_left, seats_B_left)
+        reward, next_seats_A, next_seats_B, next_customers = simulate_sales(
+            pA, pB, t, seats_A_left, seats_B_left, customers_left
+        )
         next_t = t + 1
-        next_state = (next_t, next_seats_A, next_seats_B)
+        next_state = (next_t, next_seats_A, next_seats_B, next_customers)
         
         # 終了条件
-        if next_t > days or (next_seats_A == 0 and next_seats_B == 0):
+        if next_t > days or (next_seats_A == 0 and next_seats_B == 0) or next_customers == 0:
             done = True
             next_Q = 0
         else:
+            # 次の状態を離散化
+            closest_c = customers[np.argmin(np.abs(customers - next_customers))]
+            next_state = (next_t, next_seats_A, next_seats_B, closest_c)
             next_state_idx = state_to_idx.get(next_state, state_idx)
             next_Q = np.max(Q[next_state_idx])
         
@@ -91,18 +103,22 @@ for episode in range(num_episodes):
         Q[state_idx, action_idx] += alpha * (reward + gamma * next_Q - Q[state_idx, action_idx])
         
         # 状態更新
-        t, seats_A_left, seats_B_left = next_t, next_seats_A, next_seats_B
+        t, seats_A_left, seats_B_left, customers_left = next_t, next_seats_A, next_seats_B, next_customers
     
     epsilon = max(0.01, epsilon * 0.995)  # 探索率の減衰
 
 # 全日程の最適価格と期待収益を計算
 results = []
 for t in range(1, days + 1):
-    # 代表的な状態（例：初期在庫または中間在庫）
-    for seats_A_left, seats_B_left in [(100, 150), (50, 75)]:  # 初期と中間
-        state = (t, seats_A_left, seats_B_left)
+    # 代表的な状態（初期在庫と中間在庫、顧客数は初期600と300）
+    for seats_A_left, seats_B_left, customers_left in [(100, 150, 600), (50, 75, 300)]:
+        state = (t, seats_A_left, seats_B_left, customers_left)
         if state not in state_to_idx:
-            continue
+            # 最も近い顧客数を選択
+            closest_c = customers[np.argmin(np.abs(customers - customers_left))]
+            state = (t, seats_A_left, seats_B_left, closest_c)
+            if state not in state_to_idx:
+                continue
         
         state_idx = state_to_idx[state]
         optimal_action_idx = np.argmax(Q[state_idx])
@@ -111,7 +127,9 @@ for t in range(1, days + 1):
         # 期待収益の計算（モンテカルロシミュレーション）
         total_rewards = []
         for _ in range(num_simulations):
-            reward, _, _ = simulate_sales(optimal_pA, optimal_pB, t, seats_A_left, seats_B_left)
+            reward, _, _, _ = simulate_sales(
+                optimal_pA, optimal_pB, t, seats_A_left, seats_B_left, customers_left
+            )
             total_rewards.append(reward)
         expected_reward = np.mean(total_rewards)
         
@@ -119,6 +137,7 @@ for t in range(1, days + 1):
             'Day': t,
             'Seats_A': seats_A_left,
             'Seats_B': seats_B_left,
+            'Customers_Left': customers_left,
             'Price_A': optimal_pA,
             'Price_B': optimal_pB,
             'Expected_Revenue': expected_reward
@@ -132,18 +151,22 @@ print(df_results)
 # 総収益の推定（初期状態から最適価格でシミュレーション）
 total_rewards = []
 for _ in range(num_simulations):
-    t, seats_A_left, seats_B_left = 1, 100, 150
+    t, seats_A_left, seats_B_left, customers_left = 1, 100, 150, initial_customers
     total_reward = 0
-    while t <= days and (seats_A_left > 0 or seats_B_left > 0):
-        state = (t, seats_A_left, seats_B_left)
+    while t <= days and (seats_A_left > 0 or seats_B_left > 0) and customers_left > 0:
+        state = (t, seats_A_left, seats_B_left, customers_left)
+        closest_c = customers[np.argmin(np.abs(customers - customers_left))]
+        state = (t, seats_A_left, seats_B_left, closest_c)
         state_idx = state_to_idx.get(state, None)
         if state_idx is None:
             break
         action_idx = np.argmax(Q[state_idx])
         pA, pB = actions[action_idx]
-        reward, next_seats_A, next_seats_B = simulate_sales(pA, pB, t, seats_A_left, seats_B_left)
+        reward, next_seats_A, next_seats_B, next_customers = simulate_sales(
+            pA, pB, t, seats_A_left, seats_B_left, customers_left
+        )
         total_reward += reward
-        t, seats_A_left, seats_B_left = t + 1, next_seats_A, next_seats_B
+        t, seats_A_left, seats_B_left, customers_left = t + 1, next_seats_A, next_seats_B, next_customers
     total_rewards.append(total_reward)
 print(f"\n全日程の総期待収益（平均）：{np.mean(total_rewards):.2f}円")
 print(f"総期待収益の標準偏差：{np.std(total_rewards):.2f}円")
