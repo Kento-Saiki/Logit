@@ -16,18 +16,18 @@ start = time.time()
 
 # 席種A, B および「購入しない」選択肢
 # 顧客・在庫・期間のパラメータ
-N_init = 30      # 販売開始時点の潜在顧客数
+N_init = 40      # 販売開始時点の潜在顧客数
 T = 3            # 全販売期間（日数）
 C_A_init = 10    # 席種Aの初期在庫
 C_B_init = 10    # 席種Bの初期在庫
 
 # 多項ロジットモデルのパラメータ（仮定）
-alpha_A = 0.4
-alpha_B = 0.1
+alpha_A = 4.4919 #ホームバック自由席
+alpha_B = 4.4541 #ミックスバック自由席
 beta_price = -0.0005
 
 # 最適価格の探索範囲を離散値で定義
-price_candidates = np.arange(2000, 4001, 400)
+price_candidates = np.arange(2000, 4001, 200)
 print(f"探索する価格候補: {price_candidates}")
 
 
