@@ -26,6 +26,9 @@ alpha_A = 4.4919 #ホームバック自由席
 alpha_B = 4.4541 #ミックスバック自由席
 beta_price = -0.0005
 
+print(f"初期在庫: 席種A={C_A_init}, 席種B={C_B_init}, 潜在顧客数={N_init}, 販売期間={T}日")
+print(f"多項ロジットモデルのパラメータ: α_A={alpha_A}, α_B={alpha_B}, β_price={beta_price}")
+
 # 最適価格の探索範囲を離散値で定義
 price_candidates = np.arange(2000, 4001, 200)
 print(f"探索する価格候補: {price_candidates}")
