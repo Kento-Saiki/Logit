@@ -1,121 +1,204 @@
 import numpy as np
-from scipy.optimize import minimize_scalar
 from scipy.special import gammaln
 import time
+import matplotlib.pyplot as plt
+
 start = time.time()
 
-#状況の設定
-#席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
-N_init = 2000 # 販売開始時点の潜在顧客数
-C_init = 300  # 販売開始時点のチケット在庫数（キャパシティ）
-T = 40        # 全販売期間（日数）
+# --- 1. 状況の設定 ---
+# ★警告: C_A_init, C_B_init, N_init, T の値を大きくすると計算が終わりません。
+# ★テストには C_A_init=10, C_B_init=10, N_init=30, T=3 程度を推奨します。
 
-rmin=1700 #最低価格
-rmax=17000 #最高価格
-dr=1 #価格変動幅
+# 席種A, B および「購入しない」選択肢
+# 顧客・在庫・期間のパラメータ
+N_init = 30      # 販売開始時点の潜在顧客数
+T = 3            # 全販売期間（日数）
+C_A_init = 10    # 席種Aの初期在庫
+C_B_init = 10    # 席種Bの初期在庫
 
-r=np.arange(rmin, rmax+1, dr) #価格変動範囲
-alpha=[0, 0.2596, 0.0142, 0] #固定効果 ASC 前から，購入しないという選択肢(k=0)，ホームサポーター自由席(k=1)，ミックスバック自由席(k=2)，ホームバック自由席(k=3)
-beta=[-1.5410, 2.0064, 2.3843, -3.1859] #パラメータ（価格r，相手ランクoprank，順位rank，締め切り効果deadline）
+# 多項ロジットモデルのパラメータ（仮定）
+alpha_A = 0.2
+alpha_B = 0.1
+beta_price = -0.001
 
-def V_sum(r,oprank,rank,deadline): #総効用
-    V_sum = 0
-    for k in range(4): #総効用
-        V_sum = V_sum + alpha[k] + beta[k] * r + alpha[0] + beta[0] * r + beta[1] *  oprank + beta[2] * rank + beta[3] * deadline
-    return V_sum
-
-# 確率Pの定義（ロジスティック関数の計算）選択肢kを選択
-def P(k,r,oprank,rank,deadline): #例えば，席種k，価格r=100,残り日数t=3,相手ランクoprank=10,順位rank=4,締め切り効果deadline=1/(6.5+t)
-    if k == 0 : #購入しないという選択をする場合の確率
-        return 1 / (1 + np.exp(V_sum(r,oprank,rank,deadline)))
-    else:
-        return np.exp(alpha[k] + beta[0] * r + beta[1] * oprank + beta[2] * rank + beta[3] * deadline) / (1 + np.exp(V_sum(r,oprank,rank,deadline)))
-
-def V_1(r,oprank,rank,deadline,C, N_t): #sk：席種kの購入希望者数
-    s1 = np.arange(N_t + 1) # 購入希望者数s1が0人からN_t人までの全パターン
-    s2 = np.arange(N_t+1 - s1) # 購入しない人の数s2
-    s3=np.arange(N_t+1- s1 - s2) # 在庫数Cが0からC人までの全パターン
-    # 以下は (N_t C s) * P(r)^s * (1-P(r))^(N_t-s) の計算
-    log_comb1 = gammaln(N_t + 1)- gammaln(s1 + 1)- gammaln(N_t- s1 + 1) #ガンマ関数の自然対数=ln(N_t C s)
-    log_comb2 = gammaln(N_t+1 - s1)- gammaln(s2 + 1)- gammaln(N_t+1 - s1- s2 + 1) #ガンマ関数の自然対数=ln(N_t C s)
-    log_comb3 = gammaln(N_t+1- s1 - s2)- gammaln(s3 + 1)- gammaln(N_t+1- s1 - s2- s3 + 1) #ガンマ関数の自然対数=ln(N_t C s)
-    log_p_r1 = s1 * np.log(P(1,r,oprank,rank,deadline)) #席種k=1を購入する
-    log_p_r2 = s2 * np.log(P(2,r,oprank,rank,deadline)) #席種k=2を購入する
-    log_p_r3 = s3 * np.log(P(3,r,oprank,rank,deadline)) #席種k=3を購入する
-    log_p_not_r = (N_t- s1- s2- s3) * np.log(P(0,r,oprank,rank,deadline)) #購入しない
-    log_probs = log_comb1 + log_comb2 + log_comb3 + log_p_r1 + log_p_r2 + log_p_r3 + log_p_not_r
-    probs = np.exp(log_probs- np.max(log_probs)) #数値安定性のためのシフト
-    probs /= probs.sum() #合計が1になるように正規化
-    return np.sum(probs * np.minimum(s1, C) * r) #収益の計算
-
-def V_t(r, C, V_next, N_t):
-    #--ここから，上と同様の確率の計算
-    s = np.arange(N_t + 1)
-    log_comb_vals = gammaln(N_t + 1)- gammaln(s + 1)- gammaln(N_t- s + 1)
-    log_p_r = s * np.log(P(r))
-    log_p_not_r = (N_t- s) * np.log(1- P(r))
-    log_probs = log_comb_vals + log_p_r + log_p_not_r
-    probs = np.exp(log_probs- np.max(log_probs))
-    probs /= probs.sum()
-    #--ここまで
-    V_next_values = np.array([V_next(max(C- sold, 0)) for sold in s]) #次の時点の最大価値
-    return np.sum(probs * (np.minimum(s, C) * r + V_next_values))
-
-#最適価格を求める関数
-def opt_r_t(C, V_next, N_t): #価値関数V_tが最大（-V_t が最小）になる価格 r を探
-    result = minimize_scalar(lambda r: -V_t(r, C, V_next, N_t), bounds=(0, 12), method='bounded')
-    return result.x, V_t(result.x, C, V_next, N_t)
-
-def opt_r_1(C, N_t):
-    result = minimize_scalar(lambda r: -V_1(r, C, N_t), bounds=(0, 12), method='bounded')
-    return result.x, V_1(result.x, C, N_t)
+# 最適価格の探索範囲を離散値で定義
+price_candidates = np.arange(2000, 4001, 1000)
+print(f"探索する価格候補: {price_candidates}")
 
 
-# 顧客数の減少パターンを定義
-N_dict = {0: N_init}
-for t in range(1, T):
-    if t < T // 2: #小数切り捨てで整数を返す
-    #販売期間の前半では、前日の顧客数（N_dict[t-1]）から毎日5人ずつ市場から離脱すると仮定 
-        N_dict[t] = max(N_dict[t- 1]- 5, 0)
-    else:
-        N_dict[t] = max(N_dict[t- 1]- 10, 0)
+# --- 2. 需要関数（多項ロジット）の定義 ---
+def get_probabilities(r_A, r_B):
+    """価格ペア(r_A, r_B)から、各選択肢の購入確率を計算する"""
+    V_A = alpha_A + beta_price * r_A
+    V_B = alpha_B + beta_price * r_B
+    exp_V_A = np.exp(V_A)
+    exp_V_B = np.exp(V_B)
+    denominator = 1 + exp_V_A + exp_V_B
+    
+    p_A = exp_V_A / denominator
+    p_B = exp_V_B / denominator
+    p_no_purchase = 1 / denominator
+    
+    return p_A, p_B, p_no_purchase
 
+# --- 3. 価値関数の定義（多項分布・個別在庫） ---
+# DPの状態は (C_A, C_B) のタプルで管理
+def V_1_multi(r_A, r_B, C_tuple, N_t):
+    C_A, C_B = C_tuple
+    p_A, p_B, p_0 = get_probabilities(r_A, r_B)
+    expected_revenue = 0
+    
+    # sA:席種Aの希望者, sB:席種Bの希望者
+    for s_A in range(N_t + 1):
+        for s_B in range(N_t - s_A + 1):
+            s_0 = N_t - s_A - s_B
+            
+            log_multinomial_coeff = gammaln(N_t + 1) - gammaln(s_A + 1) - gammaln(s_B + 1) - gammaln(s_0 + 1)
+            log_prob_term = s_A * np.log(p_A) + s_B * np.log(p_B) + s_0 * np.log(p_0)
+            prob = np.exp(log_multinomial_coeff + log_prob_term)
+            
+            # ★在庫制約を席種ごとに適用
+            sold_A = min(s_A, C_A)
+            sold_B = min(s_B, C_B)
+            
+            revenue = sold_A * r_A + sold_B * r_B
+            expected_revenue += prob * revenue
+            
+    return expected_revenue
 
-# V_dict の計算
+def V_t_multi(r_A, r_B, C_tuple, V_next, N_t):
+    C_A, C_B = C_tuple
+    p_A, p_B, p_0 = get_probabilities(r_A, r_B)
+    expected_total_value = 0
+    
+    for s_A in range(N_t + 1):
+        for s_B in range(N_t - s_A + 1):
+            s_0 = N_t - s_A - s_B
+            
+            log_multinomial_coeff = gammaln(N_t + 1) - gammaln(s_A + 1) - gammaln(s_B + 1) - gammaln(s_0 + 1)
+            log_prob_term = s_A * np.log(p_A) + s_B * np.log(p_B) + s_0 * np.log(p_0)
+            prob = np.exp(log_multinomial_coeff + log_prob_term)
+            
+            sold_A = min(s_A, C_A)
+            sold_B = min(s_B, C_B)
+            
+            revenue = sold_A * r_A + sold_B * r_B
+            
+            # 次の時点の在庫タプルを計算
+            next_C_tuple = (C_A - sold_A, C_B - sold_B)
+            future_value = V_next(next_C_tuple)
+            
+            expected_total_value += prob * (revenue + future_value)
+
+    return expected_total_value
+
+# --- 4. 最適価格ペア探索関数の定義 ---
+def opt_r_multi(C_tuple, V_next, N_t, is_final_day):
+    best_value = -1
+    best_prices = (price_candidates[0], price_candidates[0])
+
+    for r_A in price_candidates:
+        for r_B in price_candidates:
+            if is_final_day:
+                value = V_1_multi(r_A, r_B, C_tuple, N_t)
+            else:
+                value = V_t_multi(r_A, r_B, C_tuple, V_next, N_t)
+            
+            if value > best_value:
+                best_value = value
+                best_prices = (r_A, r_B)
+    
+    return best_prices, best_value
+
+# --- 5. DPモデルの求解（後ろ向き計算） ---
+print("--- 後ろ向き計算開始 ---")
+N_dict = {t: max(0, N_init - int(t * (N_init / (T+1)))) for t in range(T + 1)}
+
 V_dict = {}
-# t = T-1（最終日） の場合
-V_dict[T-1] = {}
-for C in range(1, C_init + 1):
-    r_max, V_max = opt_r_1(C, N_dict[T-1])
-    V_dict[T-1][C] = V_max
-# 0 <= t < T-1（最終日より前） の場合
-for t in range(T-2,-1,-1): #時間を遡って計算
+policy = {} # 最適価格ペアを保存する方針辞書
+
+for t in range(T, -1, -1):
+    print(f"DP計算中... t={t}")
     V_dict[t] = {}
-    for C in range(1, C_init + 1):
-        # 次の時点(t+1)の価値関数をラムダ式で渡す
-        r_max, V_max = opt_r_t(C, lambda C: V_dict[t+1].get(C, 0), N_dict[t])
-        V_dict[t][C] = V_max
+    policy[t] = {}
+    
+    if t == T: # 販売終了後は価値0
+        continue
+
+    # ★在庫ペア(C_A, C_B)の全組み合わせをループ
+    for C_A in range(C_A_init + 1):
+        for C_B in range(C_B_init + 1):
+            C_tuple = (C_A, C_B)
+            
+            is_final_day = (t == T - 1)
+            V_next_func = lambda next_C_tuple: V_dict[t+1].get(next_C_tuple, 0)
+            
+            prices, V_max = opt_r_multi(C_tuple, V_next_func, N_dict[t], is_final_day)
+            
+            V_dict[t][C_tuple] = V_max
+            policy[t][C_tuple] = prices
 
 
-# 各期間の最適価格を計算
-t_values = range(T)
-r_values = []
-C_values = [C_init]
+# --- 6. 最適価格の導出（前向き計算） ---
+print("\n--- 前向き計算開始 ---")
+r_A_values = []
+r_B_values = []
+C_A_path = [C_A_init]
+C_B_path = [C_B_init]
+sales_A_path = []
+sales_B_path = []
 
-for t in t_values:
-    # 現在の在庫 C_values[-1] と潜在顧客数 N_dict[t] の下で最適価格を計算
-    if t < T-1:
-        r_max, _ = opt_r_t(C_values[-1], lambda C: V_dict[t+1].get(C, 0),N_dict[t])
-    else:
-        r_max, _ = opt_r_1(C_values[-1], N_dict[t])
-    r_values.append(r_max)
-    if t < T-1:
-        if t < T // 2:
-            C_values.append(max(C_values[-1]- 5, 0))
-        else:
-            C_values.append(max(C_values[-1]- 10, 0))
+current_C_A = C_A_init
+current_C_B = C_B_init
 
-print(r_values)
+for t in range(T):
+    current_C_tuple = (current_C_A, current_C_B)
+    
+    # ★方針(policy)辞書から現在の在庫状態に最適な価格ペアを取得
+    r_max_A, r_max_B = policy[t][current_C_tuple]
+    
+    r_A_values.append(r_max_A)
+    r_B_values.append(r_max_B)
+    
+    # 期待販売数で在庫を更新
+    p_A, p_B, _ = get_probabilities(r_max_A, r_max_B)
+    
+    sold_A = min(current_C_A, int(round(N_dict[t] * p_A)))
+    sold_B = min(current_C_B, int(round(N_dict[t] * p_B)))
+    
+    sales_A_path.append(sold_A)
+    sales_B_path.append(sold_B)
+    
+    current_C_A -= sold_A
+    current_C_B -= sold_B
+    C_A_path.append(current_C_A)
+    C_B_path.append(current_C_B)
+
+    print(f"t={t}: 在庫(A,B)=({current_C_tuple}), 最適価格(A,B)=({r_max_A}, {r_max_B}), 販売数(A,B)=({sold_A}, {sold_B})")
+
+# --- 7. 結果の可視化 ---
+fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+
+# 最適価格の推移
+axs[0].plot(range(T), r_A_values, marker='o', label='席種A 最適価格')
+axs[0].plot(range(T), r_B_values, marker='s', label='席種B 最適価格')
+axs[0].set_title('最適価格の推移')
+axs[0].set_xlabel('販売期間（日）')
+axs[0].set_ylabel('価格（円）')
+axs[0].grid(True)
+axs[0].legend()
+
+# 在庫の推移
+axs[1].plot(range(T+1), C_A_path, marker='o', label='席種A 在庫')
+axs[1].plot(range(T+1), C_B_path, marker='s', label='席種B 在庫')
+axs[1].set_title('在庫数の推移')
+axs[1].set_xlabel('販売期間（日）')
+axs[1].set_ylabel('在庫数')
+axs[1].grid(True)
+axs[1].legend()
+
+plt.tight_layout()
+plt.show()
 
 end = time.time()
-print(f"Total time: {(end - start) / 60:.2f} minutes")
+print(f"\nTotal time: {(end - start):.2f} seconds")
