@@ -203,8 +203,8 @@ plt.xlim(T-1, 0) # 左にT、右に0を設定するだけで反転も兼ねる
 # 1. X軸のデータを「残り日数」で作成 (在庫はT+1個のデータ点がある)
 days_remaining_stock = np.arange(T, -1, -1)
 plt.subplot(1, 2, 2)
-plt.plot(days_remaining_stock, C_A_path, color='blue',  markersize=4, label='Home Back Stock')
-plt.plot(days_remaining_stock, C_B_path, color='red',  markersize=4, label='Mix Back Stock')
+plt.plot(days_remaining_stock, C_A_path, color='blue',  markersize=4, label='Home Back')
+plt.plot(days_remaining_stock, C_B_path, color='red',  markersize=4, label='Mix Back')
 # 2. ラベルやタイトル、グリッドなどをサブプロット(axs[1])に設定
 plt.xlabel('Remaining Days Until Match')
 plt.ylabel('Stock')
