@@ -19,7 +19,7 @@ start = time.time()
 N_init = 40      # 販売開始時点の潜在顧客数
 T = 3            # 全販売期間（日数）
 C_A_init = 10    # 席種Aの初期在庫
-C_B_init = 10    # 席種Bの初期在庫
+C_B_init = 15    # 席種Bの初期在庫
 
 # 多項ロジットモデルのパラメータ（仮定）
 alpha_A = 2.0019 #ホームバック自由席
@@ -187,24 +187,34 @@ for t in range(T):
 # --- 7. 結果の可視化 ---
 fig, axs = plt.subplots(1, 2, figsize=(16, 6))
 
-# 最適価格の推移
-axs[0].plot(range(T), r_A_values, marker='o', label='席種A 最適価格')
-axs[0].plot(range(T), r_B_values, marker='s', label='席種B 最適価格')
-axs[0].set_title('最適価格の推移')
-axs[0].set_xlabel('販売期間（日）')
-axs[0].set_ylabel('価格（円）')
-axs[0].grid(True)
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.size'] = 24
+
+#最適価格の推移
+days_remaining = np.arange(T, 0, -1)
+axs[0].plot(days_remaining, r_A_values, color='blue', markersize=4, label='Home Back')
+axs[0].plot(days_remaining, r_B_values, color='red', markersize=4, label='Mix Back')
+# 2. ラベルやタイトル、グリッドなどをサブプロット(axs[0])に設定
+axs[0].set_xlabel('Remaining Days Until Match')
+axs[0].set_ylabel('Price')
 axs[0].legend()
+# 3. X軸の範囲と反転をサブプロット(axs[0])に設定
+axs[0].set_xlim(T, 0) # 左にT、右に0を設定するだけで反転も兼ねる
 
-# 在庫の推移
-axs[1].plot(range(T+1), C_A_path, marker='o', label='席種A 在庫')
-axs[1].plot(range(T+1), C_B_path, marker='s', label='席種B 在庫')
-axs[1].set_title('在庫数の推移')
-axs[1].set_xlabel('販売期間（日）')
-axs[1].set_ylabel('在庫数')
-axs[1].grid(True)
+# 在庫の推移 ---
+# 1. X軸のデータを「残り日数」で作成 (在庫はT+1個のデータ点がある)
+days_remaining_stock = np.arange(T, -1, -1)
+axs[1].plot(days_remaining_stock, C_A_path, color='blue',  markersize=4, label='Home Back Stock')
+axs[1].plot(days_remaining_stock, C_B_path, color='red',  markersize=4, label='Mix Back Stock')
+# 2. ラベルやタイトル、グリッドなどをサブプロット(axs[1])に設定
+axs[1].set_xlabel('Remaining Days Until Match')
+axs[1].set_ylabel('Stock')
 axs[1].legend()
+# 3. X軸の範囲と反転をサブプロット(axs[1])に設定
+axs[1].set_xlim(T, 0)
 
+# 全体のレイアウトを調整して表示
 plt.tight_layout()
 plt.show()
 
