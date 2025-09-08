@@ -4,22 +4,6 @@ from scipy.special import gammaln
 import time
 start = time.time()
 
-
-#状況の設定
-#席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
-mu=-0.001  #価格感応度
-N_init = 2000 # 販売開始時点の潜在顧客数
-C_init = 1000  # 販売開始時点のチケット在庫数（キャパシティ）
-T = 10        # 全販売期間（日数）
-
-# 最適価格の探索範囲を離散値で定義
-price_min = 1000
-price_max = 5000
-price_step = 100 # 100円刻みで価格を探索
-price_candidates = np.arange(price_min, price_max + price_step, price_step)
-
-print(f"探索する価格候補 (一部): {price_candidates[:5]} ...")
-
 # 任意の1人の顧客が価格rで購入する確率P(r)の定義
 def P(r): #exp(Vi)/{exp(0)+exp(Vi)} 何も購入しない場合の効用V0=0
     return np.exp(mu * r) / (1 + np.exp(mu * r))
@@ -77,6 +61,22 @@ def opt_r_1(C, N_t):
     V_max = values[best_price_index]
     return r_max, V_max
 
+
+#状況の設定----------------------------------------------------------------------------------------------------
+#席種；ホームサポーター自由席，ミックスバック自由席，ホームバック自由席
+mu=-0.001  #価格感応度
+N_init = 200 # 販売開始時点の潜在顧客数
+C_init = 100  # 販売開始時点のチケット在庫数（キャパシティ）
+T = 5        # 全販売期間（日数）
+
+# 最適価格の探索範囲を離散値で定義
+price_min = 1000
+price_max = 3000
+price_step = 100 # 100円刻みで価格を探索
+price_candidates = np.arange(price_min, price_max + price_step, price_step)
+
+print(f"探索する価格候補 (一部): {price_candidates[:5]} ...")
+
 # 顧客数の減少パターンを定義
 N_dict = {0: N_init} #時刻0において初期顧客数がN_init人存在していることを定義
 for t in range(1, T):
@@ -88,6 +88,7 @@ for t in range(1, T):
 
 print(f"各期間の潜在顧客数: {N_dict}")
 
+#------------------------------------------------------------------------------------------------------------
 #以下，後ろ向き帰納法で価値関数を計算（ここがV_maxに該当）
 #全てのあり得る状況（時点tと在庫Cの組み合わせ）について、
 #「最大の期待収益（価値）」を計算し、V_dictに保存「戦略マップ」
@@ -107,6 +108,8 @@ for t in range(T-2,-1,-1): #時間を遡って計算 T-2⇒T-1⇒...⇒0
         r_max, V_max = opt_r_t(C, lambda C: V_dict[t+1].get(C, 0), N_dict[t]) #T-1より前の時点なので在庫を考慮
         V_dict[t][C] = V_max
 
+#------------------------------------------------------------------------------------------------------------
+#以下，前向き計算で最適価格を計算（ここがr_maxに該当）
 # 各期間の最適価格を計算（前向き計算の実施）「具体的な駒の動き」
 t_values = range(T) # 各期間の時刻t 0,1,2,...,T-1
 r_values = [] # 各期間の最適価格を格納するリスト
@@ -114,7 +117,7 @@ C_values = [C_init] #在庫の初期値を設定してスタート
 sales = [] # ← 販売枚数を格納するリスト
 
 for t in t_values: #時間を前向きに進めながら計算
-    current_C = C_values[-1]
+    current_C = C_values[-1] # 現在の在庫（最後に格納されたデータなので-1）
 
     if t < T-1: #最終販売日前日以前 T-1の場合
         r_max, _ = opt_r_t(C_values[-1], lambda C: V_dict[t+1].get(C, 0), N_dict[t])
